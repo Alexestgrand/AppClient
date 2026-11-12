@@ -1,0 +1,24 @@
+---
+import Layout from '@/layouts/Layout.astro';
+import ProductsManager from '@/components/ProductsManager';
+import { categoryService, productService, warehouseService } from '@/services/catalog.service';
+import { settingsService } from '@/services/settings.service';
+import { toJson } from '@/types/dto';
+
+const [products, categories, warehouses, settings] = await Promise.all([
+  productService.list({}),
+  categoryService.list(),
+  warehouseService.list(),
+  settingsService.get(),
+]);
+---
+
+<Layout title="Produits">
+  <ProductsManager
+    client:load
+    initialRows={toJson(products)}
+    categories={categories.map(({ id, name }) => ({ id, name }))}
+    warehouses={warehouses.map(({ id, name }) => ({ id, name }))}
+    currency={settings.mainCurrency}
+  />
+</Layout>

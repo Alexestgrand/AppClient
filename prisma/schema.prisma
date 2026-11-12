@@ -1,0 +1,205 @@
+// Schéma de la base PostgreSQL.
+// Montants : Decimal(14,4) (jamais de Float). Taux : Decimal(6,3).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  sessions     Session[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+/// Session serveur : seul le hash SHA-256 du jeton est stocké.
+model Session {
+  id         String   @id @default(cuid())
+  tokenHash  String   @unique
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+
+  @@index([expiresAt])
+  @@index([userId])
+}
+
+model Country {
+  id             String               @id @default(cuid())
+  name           String
+  isoCode        String               @unique @db.Char(2)
+  currencyCode   String               @db.Char(3)
+  isActive       Boolean              @default(true)
+  taxSource      String?
+  taxSourceUrl   String?
+  lastVerifiedAt DateTime?
+  vatRates       VatRate[]
+  warehouses     Warehouse[]
+  calculations   CalculationHistory[]
+  sales          Sale[]
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  @@index([isActive])
+}
+
+enum VatRateType {
+  STANDARD
+  REDUCED
+  SUPER_REDUCED
+  ZERO
+}
+
+model VatRate {
+  id        String      @id @default(cuid())
+  countryId String
+  country   Country     @relation(fields: [countryId], references: [id], onDelete: Cascade)
+  label     String
+  type      VatRateType
+  rate      Decimal     @db.Decimal(6, 3)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@index([countryId])
+}
+
+/// Taux de change saisi manuellement : 1 unité de devise principale = `rate` unités de `currencyCode`.
+model ExchangeRate {
+  id           String   @id @default(cuid())
+  currencyCode String   @unique @db.Char(3)
+  rate         Decimal  @db.Decimal(18, 8)
+  source       String?
+  rateDate     DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  products    Product[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Warehouse {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  address     String?
+  countryId   String
+  country     Country   @relation(fields: [countryId], references: [id], onDelete: Restrict)
+  description String?
+  isActive    Boolean   @default(true)
+  products    Product[]
+  sales       Sale[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([countryId])
+}
+
+model Product {
+  id            String               @id @default(cuid())
+  name          String
+  reference     String               @unique
+  description   String?
+  purchasePrice Decimal              @db.Decimal(14, 4)
+  costPrice     Decimal?             @db.Decimal(14, 4)
+  categoryId    String?
+  category      Category?            @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  warehouseId   String?
+  warehouse     Warehouse?           @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  calculations  CalculationHistory[]
+  sales         Sale[]
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  @@index([name])
+  @@index([categoryId])
+  @@index([warehouseId])
+}
+
+enum CalculationType {
+  VAT
+  INTERNATIONAL
+}
+
+/// Instantané d'un calcul : les valeurs sont figées, une modification ultérieure
+/// d'un taux ou d'un produit ne réécrit pas l'historique.
+model CalculationHistory {
+  id             String          @id @default(cuid())
+  type           CalculationType
+  productId      String?
+  product        Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
+  countryId      String?
+  country        Country?        @relation(fields: [countryId], references: [id], onDelete: SetNull)
+  countryName    String?
+  currency       String          @db.Char(3)
+  initialPrice   Decimal         @db.Decimal(14, 4)
+  vatRate        Decimal         @db.Decimal(6, 3)
+  priceExclTax   Decimal         @db.Decimal(14, 4)
+  vatAmount      Decimal         @db.Decimal(14, 4)
+  priceInclTax   Decimal         @db.Decimal(14, 4)
+  targetAmount   Decimal?        @db.Decimal(14, 4)
+  profit         Decimal?        @db.Decimal(14, 4)
+  /// Entrées et résultat complets (mode, frais, ventilation…).
+  details        Json
+  label          String?
+  createdAt      DateTime        @default(now())
+
+  @@index([createdAt])
+  @@index([type])
+  @@index([countryId])
+}
+
+/// Vente enregistrée. Les montants en devise principale sont figés au moment de la vente
+/// (taux de change et coût de revient instantanés) pour des statistiques stables.
+model Sale {
+  id                  String     @id @default(cuid())
+  saleDate            DateTime
+  productId           String?
+  product             Product?   @relation(fields: [productId], references: [id], onDelete: SetNull)
+  productName         String
+  countryId           String
+  country             Country    @relation(fields: [countryId], references: [id], onDelete: Restrict)
+  warehouseId         String?
+  warehouse           Warehouse? @relation(fields: [warehouseId], references: [id], onDelete: SetNull)
+  quantity            Int
+  currency            String     @db.Char(3)
+  exchangeRate        Decimal    @db.Decimal(18, 8)
+  unitPriceExclTax    Decimal    @db.Decimal(14, 4)
+  vatRate             Decimal    @db.Decimal(6, 3)
+  /// Montants totaux en devise principale.
+  revenueExclTax      Decimal    @db.Decimal(14, 4)
+  vatCollected        Decimal    @db.Decimal(14, 4)
+  totalCost           Decimal    @db.Decimal(14, 4)
+  totalFees           Decimal    @db.Decimal(14, 4)
+  profit              Decimal    @db.Decimal(14, 4)
+  note                String?
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  @@index([saleDate])
+  @@index([countryId])
+  @@index([warehouseId])
+  @@index([productId])
+}
+
+/// Paramètres de l'application (ligne unique id = 1).
+model AppSettings {
+  id                  Int      @id @default(1)
+  companyName         String   @default("Mon entreprise")
+  mainCurrency        String   @default("EUR") @db.Char(3)
+  defaultTargetAmount Decimal  @default(5) @db.Decimal(14, 4)
+  updatedAt           DateTime @updatedAt
+}

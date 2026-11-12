@@ -1,0 +1,12 @@
+---
+import Layout from '@/layouts/Layout.astro';
+import CategoriesManager from '@/components/CategoriesManager';
+import { categoryService } from '@/services/catalog.service';
+import { toJson } from '@/types/dto';
+
+const categories = await categoryService.list();
+---
+
+<Layout title="Catégories">
+  <CategoriesManager client:load initialRows={toJson(categories)} />
+</Layout>

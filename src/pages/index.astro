@@ -1,0 +1,205 @@
+---
+import Layout from '@/layouts/Layout.astro';
+import { GroupedBarChart, MonthlyChart, ShareBar } from '@/components/charts';
+import { Stat } from '@/components/ui';
+import { historyService } from '@/services/calculation.service';
+import { settingsService } from '@/services/settings.service';
+import { statsService } from '@/services/stats.service';
+import { parsePeriod } from '@/utils/period';
+import { formatDate, formatMoney } from '@/utils/format';
+
+const params = Astro.url.searchParams;
+const preset = params.get('period') ?? '12m';
+const iso = (date: Date) => date.toISOString().slice(0, 10);
+const now = new Date();
+const presets: Record<string, { label: string; from?: string }> = {
+  '30d': { label: '30 jours', from: iso(new Date(now.getTime() - 30 * 86400000)) },
+  '12m': { label: '12 mois', from: iso(new Date(now.getFullYear() - 1, now.getMonth() + 1, 1)) },
+  ytd: { label: 'Année en cours', from: `${now.getFullYear()}-01-01` },
+  all: { label: 'Tout' },
+  custom: { label: 'Personnalisée' },
+};
+const from = preset === 'custom' ? (params.get('from') ?? '') : (presets[preset]?.from ?? '');
+const to = preset === 'custom' ? (params.get('to') ?? '') : '';
+const period = parsePeriod(new URLSearchParams({ from, to }));
+
+const [settings, counts, stats, recent] = await Promise.all([
+  settingsService.get(),
+  statsService.counts(),
+  statsService.sales(period),
+  historyService.recent(5),
+]);
+const currency = settings.mainCurrency;
+const t = stats.totals;
+const marginRate =
+  Number(t.revenue) > 0 ? ((Number(t.profit) / Number(t.revenue)) * 100).toFixed(1) : null;
+---
+
+<Layout title="Tableau de bord">
+  <div class="space-y-6">
+    <div class="grid grid-cols-2 gap-3 lg:grid-cols-5">
+      <a href="/products">
+        <Stat label="Produits" value={String(counts.products)} />
+      </a>
+      <a href="/categories">
+        <Stat label="Catégories" value={String(counts.categories)} />
+      </a>
+      <a href="/warehouses">
+        <Stat label="Entrepôts" value={String(counts.warehouses)} />
+      </a>
+      <a href="/countries">
+        <Stat label="Pays actifs" value={String(counts.countries)} />
+      </a>
+      <a
+        href="/calculator"
+        class="card col-span-2 flex items-center justify-center bg-blue-700 font-semibold text-white hover:bg-blue-800 lg:col-span-1"
+      >
+        Ouvrir le calculateur →
+      </a>
+    </div>
+
+    <section class="space-y-4">
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <h2 class="text-xl font-semibold">Ventes</h2>
+        <form method="get" class="flex flex-wrap items-end gap-2">
+          <select name="period" class="input w-auto" aria-label="Période">
+            {Object.entries(presets).map(([key, value]) => (
+              <option value={key} selected={key === preset}>
+                {value.label}
+              </option>
+            ))}
+          </select>
+          <input
+            type="date"
+            name="from"
+            value={preset === 'custom' ? from : ''}
+            class="input w-auto"
+            aria-label="Du"
+          />
+          <input type="date" name="to" value={to} class="input w-auto" aria-label="Au" />
+          <button class="btn" type="submit">
+            Filtrer
+          </button>
+        </form>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <Stat
+          label="Chiffre d'affaires HT"
+          value={formatMoney(t.revenue, currency)}
+          hint={`${t.count} vente(s) · ${t.quantity} unité(s)`}
+        />
+        <Stat label="Coût de revient" value={formatMoney(t.cost, currency)} tone="muted" />
+        <Stat label="Frais variables" value={formatMoney(t.fees, currency)} tone="muted" />
+        <Stat
+          label="Bénéfice"
+          value={formatMoney(t.profit, currency)}
+          tone={Number(t.profit) >= 0 ? 'positive' : 'negative'}
+          hint={marginRate ? `${marginRate} % du CA HT` : undefined}
+        />
+        <Stat
+          label="TVA collectée"
+          value={formatMoney(t.vat, currency)}
+          tone="muted"
+          hint="À reverser — pas un gain"
+        />
+      </div>
+
+      <div class="card">
+        <h3 class="mb-3 font-semibold">Évolution mensuelle</h3>
+        <MonthlyChart rows={stats.byMonth} currency={currency} />
+      </div>
+
+      <div class="grid gap-4 lg:grid-cols-2">
+        <div class="card space-y-4">
+          <h3 class="font-semibold">Par pays de vente</h3>
+          <ShareBar rows={stats.byCountry} currency={currency} />
+          <GroupedBarChart rows={stats.byCountry} currency={currency} />
+        </div>
+        <div class="card space-y-4">
+          <h3 class="font-semibold">Par entrepôt</h3>
+          <ShareBar rows={stats.byWarehouse} currency={currency} />
+          <GroupedBarChart rows={stats.byWarehouse} currency={currency} />
+        </div>
+      </div>
+
+      <div class="card overflow-x-auto p-0">
+        <table class="table">
+          <caption class="px-3 pt-3 text-left font-semibold">Top 10 produits (CA HT)</caption>
+          <thead>
+            <tr>
+              <th>Produit</th>
+              <th class="text-right">Unités</th>
+              <th class="text-right">CA HT</th>
+              <th class="text-right">Bénéfice</th>
+            </tr>
+          </thead>
+          <tbody>
+            {stats.byProduct.length === 0 ? (
+              <tr>
+                <td colspan="4" class="py-4 text-center text-slate-600">
+                  Aucune vente sur la période.{' '}
+                  <a class="text-blue-700 underline" href="/sales">
+                    Enregistrer une vente
+                  </a>
+                </td>
+              </tr>
+            ) : (
+              stats.byProduct.map((row) => (
+                <tr>
+                  <td>{row.label}</td>
+                  <td class="text-right tabular-nums">{row.quantity}</td>
+                  <td class="text-right tabular-nums">{formatMoney(row.revenue, currency)}</td>
+                  <td class="text-right tabular-nums">{formatMoney(row.profit, currency)}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card overflow-x-auto p-0">
+      <div class="flex items-center justify-between px-3 pt-3">
+        <h2 class="font-semibold">Derniers calculs</h2>
+        <a href="/history" class="text-sm text-blue-700 underline">
+          Tout l'historique
+        </a>
+      </div>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Pays</th>
+            <th>Libellé / produit</th>
+            <th class="text-right">HT</th>
+            <th class="text-right">TTC</th>
+          </tr>
+        </thead>
+        <tbody>
+          {recent.length === 0 ? (
+            <tr>
+              <td colspan="5" class="py-4 text-center text-slate-600">
+                Aucun calcul enregistré.
+              </td>
+            </tr>
+          ) : (
+            recent.map((row) => (
+              <tr>
+                <td class="whitespace-nowrap">{formatDate(row.createdAt, true)}</td>
+                <td>{row.countryName ?? '—'}</td>
+                <td>{row.label ?? row.product?.name ?? '—'}</td>
+                <td class="text-right tabular-nums">
+                  {formatMoney(row.priceExclTax, row.currency)}
+                </td>
+                <td class="text-right tabular-nums">
+                  {formatMoney(row.priceInclTax, row.currency)}
+                </td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </section>
+  </div>
+</Layout>

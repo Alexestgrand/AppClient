@@ -1,0 +1,11 @@
+---
+import Layout from '@/layouts/Layout.astro';
+import Calculator from '@/components/Calculator';
+import { loadCalculatorContext } from '@/services/context.service';
+
+const context = await loadCalculatorContext();
+---
+
+<Layout title="Calculateur">
+  <Calculator client:load {...context} />
+</Layout>

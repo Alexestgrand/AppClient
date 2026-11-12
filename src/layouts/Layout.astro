@@ -1,0 +1,98 @@
+---
+import '@/styles/global.css';
+import Nav from '@/components/Nav.astro';
+import TextSize from '@/components/TextSize.astro';
+
+interface Props {
+  title: string;
+}
+const { title } = Astro.props;
+const user = Astro.locals.user;
+const path = Astro.url.pathname;
+---
+
+<!doctype html>
+<html lang="fr" data-text="lg">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>{title} · TVA & Prix</title>
+    <script is:inline>
+      // Applique la taille de texte choisie avant l'affichage (pas de clignotement).
+      try {
+        const size = localStorage.getItem('text-size');
+        if (size) document.documentElement.dataset.text = size;
+      } catch {
+        /* stockage indisponible : taille par défaut */
+      }
+    </script>
+  </head>
+  <body class="min-h-screen bg-slate-50 text-slate-900">
+    {user ? (
+      <div class="lg:flex">
+        <aside class="border-b-2 border-slate-200 bg-white lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-72 lg:shrink-0 lg:flex-col lg:border-r-2 lg:border-b-0">
+          <details class="lg:hidden">
+            <summary class="flex cursor-pointer list-none items-center justify-between px-4 py-3">
+              <span class="text-xl font-bold text-blue-800">TVA & Prix</span>
+              <span class="btn btn-primary">☰ Menu</span>
+            </summary>
+            <Nav path={path} />
+            <div class="flex flex-col gap-3 border-t-2 border-slate-200 p-4">
+              <TextSize />
+              <form method="post" action="/api/auth/logout">
+                <button class="btn w-full" type="submit">
+                  Se déconnecter
+                </button>
+              </form>
+            </div>
+          </details>
+          <div class="hidden lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
+            <div class="px-5 py-4 text-xl font-bold text-blue-800">TVA & Prix</div>
+            <div class="min-h-0 flex-1 overflow-y-auto">
+              <Nav path={path} />
+            </div>
+            <div class="flex flex-col gap-3 border-t-2 border-slate-200 p-4">
+              <TextSize />
+              <p class="truncate text-sm text-slate-700">{user.email}</p>
+              <form method="post" action="/api/auth/logout">
+                <button class="btn w-full" type="submit">
+                  Se déconnecter
+                </button>
+              </form>
+            </div>
+          </div>
+        </aside>
+        <main class="min-w-0 flex-1 p-4 lg:p-8">
+          <h1 class="mb-6 text-3xl font-bold">{title}</h1>
+          <slot />
+        </main>
+      </div>
+    ) : (
+      <main class="flex min-h-screen items-center justify-center p-4">
+        <slot />
+      </main>
+    )}
+    <script is:inline>
+      document.querySelectorAll('[data-text-size]').forEach((button) => {
+        const sync = () =>
+          button.setAttribute(
+            'aria-pressed',
+            String(document.documentElement.dataset.text === button.dataset.textSize),
+          );
+        sync();
+        button.addEventListener('click', () => {
+          document.documentElement.dataset.text = button.dataset.textSize;
+          try {
+            localStorage.setItem('text-size', button.dataset.textSize);
+          } catch {
+            /* stockage indisponible : taille par défaut */
+          }
+          document
+            .querySelectorAll('[data-text-size]')
+            .forEach((b) => b.setAttribute('aria-pressed', String(b === button)));
+        });
+      });
+    </script>
+  </body>
+</html>

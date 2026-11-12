@@ -1,0 +1,42 @@
+---
+import Layout from '@/layouts/Layout.astro';
+import CountriesManager from '@/components/CountriesManager';
+import ExchangeRatesManager from '@/components/ExchangeRatesManager';
+import { Alert } from '@/components/ui';
+import { countryService, exchangeRateService } from '@/services/country.service';
+import { settingsService } from '@/services/settings.service';
+import { toJson } from '@/types/dto';
+
+const [countries, rates, settings] = await Promise.all([
+  countryService.list(),
+  exchangeRateService.list(),
+  settingsService.get(),
+]);
+---
+
+<Layout title="Pays, TVA et devises">
+  <div class="space-y-8">
+    <Alert kind="warning">
+      Les taux de TVA sont administrés manuellement. Vérifiez chaque taux auprès d'une source
+      officielle, puis renseignez la source et la date de vérification. Les règles fiscales
+      diffèrent selon les pays (B2B, OSS, seuils, exonérations…) : cette application ne garantit pas
+      la conformité fiscale.
+    </Alert>
+    <section>
+      <h2 class="mb-3 text-xl font-semibold">Pays</h2>
+      <CountriesManager client:load initialRows={toJson(countries)} />
+    </section>
+    <section>
+      <h2 class="mb-1 text-xl font-semibold">Taux de change</h2>
+      <p class="mb-3 text-sm text-slate-600">
+        Utilisés pour convertir les prix de la devise principale ({settings.mainCurrency}) vers la
+        devise de chaque pays.
+      </p>
+      <ExchangeRatesManager
+        client:load
+        initialRows={toJson(rates)}
+        mainCurrency={settings.mainCurrency}
+      />
+    </section>
+  </div>
+</Layout>

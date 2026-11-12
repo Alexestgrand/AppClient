@@ -1,0 +1,23 @@
+---
+import Layout from '@/layouts/Layout.astro';
+import HistoryManager from '@/components/HistoryManager';
+import { historyService } from '@/services/calculation.service';
+import { countryService } from '@/services/country.service';
+import { settingsService } from '@/services/settings.service';
+import { toJson } from '@/types/dto';
+
+const [history, countries, settings] = await Promise.all([
+  historyService.list({}),
+  countryService.list(),
+  settingsService.get(),
+]);
+---
+
+<Layout title="Historique des calculs">
+  <HistoryManager
+    client:load
+    initialRows={toJson(history)}
+    countries={countries.map(({ id, name }) => ({ id, name }))}
+    mainCurrency={settings.mainCurrency}
+  />
+</Layout>

@@ -1,0 +1,17 @@
+---
+import Layout from '@/layouts/Layout.astro';
+import WarehousesManager from '@/components/WarehousesManager';
+import { warehouseService } from '@/services/catalog.service';
+import { countryService } from '@/services/country.service';
+import { toJson } from '@/types/dto';
+
+const [warehouses, countries] = await Promise.all([warehouseService.list(), countryService.list()]);
+---
+
+<Layout title="Entrepôts">
+  <WarehousesManager
+    client:load
+    initialRows={toJson(warehouses)}
+    countries={countries.map(({ id, name }) => ({ id, name }))}
+  />
+</Layout>

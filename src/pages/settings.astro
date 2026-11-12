@@ -1,0 +1,19 @@
+---
+import Layout from '@/layouts/Layout.astro';
+import SettingsForms from '@/components/SettingsForms';
+import { settingsService } from '@/services/settings.service';
+
+const settings = await settingsService.get();
+---
+
+<Layout title="Paramètres">
+  <SettingsForms
+    client:load
+    settings={{
+      companyName: settings.companyName,
+      mainCurrency: settings.mainCurrency,
+      defaultTargetAmount: settings.defaultTargetAmount.toString(),
+    }}
+    email={Astro.locals.user?.email ?? ''}
+  />
+</Layout>

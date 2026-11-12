@@ -1,0 +1,37 @@
+# Lancement complet : PostgreSQL + application.
+#   cp .env.example .env   (puis adaptez POSTGRES_PASSWORD, ADMIN_*, APP_ORIGIN)
+#   docker compose up -d --build
+#   docker compose exec app pnpm db:seed
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-tva}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tva}
+      POSTGRES_DB: ${POSTGRES_DB:-tva}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-tva}:${POSTGRES_PASSWORD:-tva}@db:5432/${POSTGRES_DB:-tva}?schema=public
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      SESSION_TTL_HOURS: ${SESSION_TTL_HOURS:-12}
+      APP_ORIGIN: ${APP_ORIGIN:-}
+    ports:
+      - '${APP_PORT:-4321}:4321'
+
+volumes:
+  pgdata:

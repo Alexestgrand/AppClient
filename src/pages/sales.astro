@@ -1,0 +1,27 @@
+---
+import Layout from '@/layouts/Layout.astro';
+import SalesManager from '@/components/SalesManager';
+import { loadCalculatorContext } from '@/services/context.service';
+import { saleService } from '@/services/sale.service';
+import { warehouseService } from '@/services/catalog.service';
+import { toJson } from '@/types/dto';
+
+const [context, sales, warehouses] = await Promise.all([
+  loadCalculatorContext(),
+  saleService.list({}),
+  warehouseService.list(),
+]);
+---
+
+<Layout title="Transactions — Ventes">
+  <p class="mb-4 text-sm text-slate-600">
+    Les montants (CA, coût, frais, bénéfice) sont figés à l'enregistrement dans la devise
+    principale, au taux de change en vigueur. Ils alimentent les graphiques du tableau de bord.
+  </p>
+  <SalesManager
+    client:load
+    {...context}
+    initialRows={toJson(sales)}
+    warehouses={warehouses.filter((w) => w.isActive).map(({ id, name }) => ({ id, name }))}
+  />
+</Layout>

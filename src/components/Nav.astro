@@ -1,0 +1,121 @@
+---
+/**
+ * Menu principal, organisé par sections.
+ * Lisibilité : grandes zones cliquables, élément actif en surbrillance forte (fond plein),
+ * icônes pour un repérage rapide, actions d'ajout rapide.
+ */
+interface Props {
+  path: string;
+}
+const { path } = Astro.props;
+
+// Icônes au trait (24×24), dessinées en SVG inline.
+const icons: Record<string, string> = {
+  dashboard: 'M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z',
+  transactions: 'M7 7h13l-3-3M17 17H4l3 3',
+  calculator:
+    'M6 2h12a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm1 4h10v4H7zm0 7h2m4 0h2m-8 4h2m4 0h2',
+  history: 'M3 12a9 9 0 1 0 3-6.7L3 8m0-5v5h5m4-1v5l3 3',
+  products: 'M21 8l-9-5-9 5 9 5 9-5zm-18 0v8l9 5 9-5V8',
+  categories: 'M4 4h7v7H4zm9 0h7v7h-7zM4 13h7v7H4zm9 0h7v7h-7z',
+  warehouses: 'M3 21V9l9-6 9 6v12M7 21v-8h10v8M7 17h10',
+  countries:
+    'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zm-9-9h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18',
+  settings:
+    'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm7.4-3a7.4 7.4 0 0 0-.1-1.3l2-1.6-2-3.4-2.4 1a7.5 7.5 0 0 0-2.2-1.3L14.4 3h-4l-.3 2.4a7.5 7.5 0 0 0-2.2 1.3l-2.4-1-2 3.4 2 1.6a7.4 7.4 0 0 0 0 2.6l-2 1.6 2 3.4 2.4-1a7.5 7.5 0 0 0 2.2 1.3l.3 2.4h4l.3-2.4a7.5 7.5 0 0 0 2.2-1.3l2.4 1 2-3.4-2-1.6c.1-.4.1-.9.1-1.3z',
+  plus: 'M12 5v14M5 12h14',
+};
+
+const sections = [
+  { title: 'Pilotage', items: [{ href: '/', label: 'Tableau de bord', icon: 'dashboard' }] },
+  { title: 'Transactions', items: [{ href: '/sales', label: 'Ventes', icon: 'transactions' }] },
+  {
+    title: 'Calculs',
+    items: [
+      { href: '/calculator', label: 'Calculateur', icon: 'calculator' },
+      { href: '/history', label: 'Historique', icon: 'history' },
+    ],
+  },
+  {
+    title: 'Catalogue',
+    items: [
+      { href: '/products', label: 'Produits', icon: 'products' },
+      { href: '/categories', label: 'Catégories', icon: 'categories' },
+      { href: '/warehouses', label: 'Entrepôts', icon: 'warehouses' },
+    ],
+  },
+  {
+    title: 'Fiscalité',
+    items: [{ href: '/countries', label: 'Pays, TVA et devises', icon: 'countries' }],
+  },
+  { title: 'Compte', items: [{ href: '/settings', label: 'Paramètres', icon: 'settings' }] },
+];
+
+const quickAdd = [
+  { href: '/sales?new=1', label: 'Vente' },
+  { href: '/products?new=1', label: 'Produit' },
+  { href: '/categories?new=1', label: 'Catégorie' },
+  { href: '/warehouses?new=1', label: 'Entrepôt' },
+  { href: '/countries?new=1', label: 'Pays' },
+];
+
+const isActive = (href: string) => (href === '/' ? path === '/' : path.startsWith(href));
+---
+
+<nav aria-label="Menu principal" class="flex flex-col gap-4 px-3 pb-4">
+  <div class="rounded-lg border-2 border-blue-700 bg-blue-50 p-2">
+    <div class="px-2 pb-1 text-sm font-bold tracking-wide text-blue-900 uppercase">
+      Ajout rapide
+    </div>
+    <div class="grid grid-cols-2 gap-1.5">
+      {quickAdd.map((item) => (
+        <a href={item.href} class="nav-quick">
+          <svg
+            viewBox="0 0 24 24"
+            class="h-5 w-5 shrink-0"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            aria-hidden="true"
+          >
+            <path d={icons.plus} />
+          </svg>
+          {item.label}
+        </a>
+      ))}
+    </div>
+  </div>
+
+  {sections.map((section) => (
+    <div>
+      <div class="px-3 pb-1 text-sm font-bold tracking-wide text-slate-600 uppercase">
+        {section.title}
+      </div>
+      <ul class="flex flex-col gap-1">
+        {section.items.map((item) => (
+          <li>
+            <a
+              href={item.href}
+              class:list={['nav-link', { 'nav-link-active': isActive(item.href) }]}
+              aria-current={isActive(item.href) ? 'page' : undefined}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                class="h-6 w-6 shrink-0"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d={icons[item.icon]} />
+              </svg>
+              {item.label}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  ))}
+</nav>

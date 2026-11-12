@@ -1,0 +1,10 @@
+---
+import Layout from '@/layouts/Layout.astro';
+import LoginForm from '@/components/LoginForm';
+
+const next = Astro.url.searchParams.get('next') ?? '/';
+---
+
+<Layout title="Connexion">
+  <LoginForm client:load next={next} />
+</Layout>
